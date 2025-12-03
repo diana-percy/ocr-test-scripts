@@ -28,9 +28,3 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Project-specific (ignore contents, but keep folders via .gitkeep)
-resources/*
-!resources/.gitkeep
-output/*
-!output/.gitkeep
