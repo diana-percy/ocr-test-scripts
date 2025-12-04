@@ -5,7 +5,7 @@ Test scripts for validating OCR integration via LiteLLM.
 ## Prerequisites
 
 ```bash
-pip install requests reportlab pillow python-dotenv
+pip install requests reportlab pillow python-dotenv openai pymupdf
 ```
 
 ## Configuration
@@ -24,75 +24,77 @@ API_KEY=your-api-key
 BASE_URL=https://api.com
 ```
 
-3. Optionally update `OCR_MODEL` in `config.py`:
+## Supported OCR Models
 
-```python
-# config.py
-OCR_MODEL = "mistral-ocr-2505"  # or any other OCR model
-```
+This repo contains model-specific test scripts for different OCR providers:
 
-### Supported OCR Models
+| Provider    | Model Name         | Endpoint               | Script(s)                                        |
+| ----------- | ------------------ | ---------------------- | ------------------------------------------------ |
+| Mistral     | `mistral-ocr-2505` | `/v1/ocr`              | `test_mistral_ocr.py`, `mistral_ocr_to_pdf.py`   |
+| DeepSeek AI | `deepseek-ocr`     | `/v1/chat/completions` | `test_deepseek_ocr.py`, `deepseek_ocr_to_pdf.py` |
 
-Update `OCR_MODEL` in `config.py` to test different providers:
-
-| Provider    | Model Name         |
-| ----------- | ------------------ |
-| Mistral     | `mistral-ocr-2505` |
-| Deepseek AI | `deepseek-ocr`     |
+**Note:** Mistral OCR uses the dedicated `/v1/ocr` endpoint, while DeepSeek-OCR uses the standard `/v1/chat/completions` endpoint with multimodal messages.
 
 ## Scripts
 
 Place your input files in the `resources/` folder. Generated PDFs will be saved to `output/`.
 
-### 1. Test OCR with Images
+### Mistral OCR Scripts
 
-Extract text from images (JPG, PNG, etc.):
+These scripts use the `/v1/ocr` endpoint with Mistral's OCR model.
+
+#### Test OCR (Images and PDFs)
 
 ```bash
-python test_ocr_image.py <image_file>
+python test_mistral_ocr.py <file>
+python test_mistral_ocr.py <file> --include-images  # Include base64 image embeddings
 ```
 
-### 2. Test OCR with PDFs
-
-Extract text from PDF documents:
+#### Convert to Searchable PDF
 
 ```bash
-python test_ocr_pdf.py <pdf_file>
-python test_ocr_pdf.py <pdf_file> --include-images  # Include base64 image embeddings in response
-```
-
-### 3. Convert Image/PDF to Searchable PDF
-
-Extract text and images from an image or PDF and generate a formatted PDF:
-
-```bash
-python ocr_to_pdf.py <input_file> [output.pdf]
+python mistral_ocr_to_pdf.py <input_file> [output.pdf]
 
 # Examples:
-python ocr_to_pdf.py scan.jpg                    # Creates output/scan_ocr.pdf
-python ocr_to_pdf.py document.pdf out.pdf        # Creates output/out.pdf
+python mistral_ocr_to_pdf.py scan.jpg                    # Creates output/scan_ocr.pdf
+python mistral_ocr_to_pdf.py document.pdf out.pdf        # Creates output/out.pdf
 ```
 
-Supported input formats: jpg, jpeg, png, gif, webp, pdf
+### DeepSeek OCR Scripts
 
-The output PDF includes:
+These scripts use the `/v1/chat/completions` endpoint with DeepSeek's OCR model.
 
-- **Headers** properly formatted (H1, H2, H3)
-- **Tables** with proper styling and alternating row colors
-- **Images** embedded in their correct positions in the document
-- **Lists** (bullet and numbered)
-- **Inline formatting** (bold, italic, code)
+**Notes:**
+
+- For PDF input, pages are automatically converted to images first using PyMuPDF, then OCR'd page by page.
+- **Test script** (`test_deepseek_ocr.py`): Uses `Free OCR.` prompt for simple text extraction.
+- **PDF conversion script** (`deepseek_ocr_to_pdf.py`): Uses grounding prompts for PDFs to extract embedded images:
+  - PDFs: `<|grounding|>Convert the document to markdown.` (extracts images)
+  - Images: `Free OCR.` (text only, grounding causes issues with standalone images)
+
+#### Test OCR (Images and PDFs)
+
+```bash
+python test_deepseek_ocr.py <file>
+```
+
+#### Convert to Searchable PDF
+
+```bash
+python deepseek_ocr_to_pdf.py <input_file> [output.pdf]
+```
 
 ## What to Expect
 
-### Successful Response (test_ocr_image.py)
+### Successful Response (test_mistral_ocr.py)
 
 ```
-python test_ocr_image.py receipt.jpeg
+python test_mistral_ocr.py receipt.jpeg
 📸 Encoding image: resources/receipt.jpeg
-✅ Image encoded (141940 characters)
+✅ File encoded (141940 characters)
 
-🚀 Sending to OCR model: mistral-ocr-2505
+🚀 Sending to Mistral OCR model: mistral-ocr-2505
+   Using /v1/ocr endpoint
 
 ============================================================
 RAW API RESPONSE
@@ -111,7 +113,6 @@ RAW API RESPONSE
     }
   ],
   "model": "mistral-ocr-2505",
-  "document_annotation": null,
   "usage_info": {
     "pages_processed": 1,
     "doc_size_bytes": 106454
@@ -120,15 +121,55 @@ RAW API RESPONSE
 }
 ```
 
-### Successful Response (ocr_to_pdf.py)
+### Successful Response (test_deepseek_ocr.py)
+
+```
+python test_deepseek_ocr.py receipt.jpeg
+📸 Encoding image: resources/receipt.jpeg
+✅ Image encoded (141940 characters)
+   MIME type: image/jpeg
+
+🚀 Sending to DeepSeek-OCR model: deepseek-ocr
+   Using /v1/chat/completions endpoint
+   Prompt: Free OCR.
+
+============================================================
+EXTRACTED TEXT
+============================================================
+12-21
+REG
+CLERK 2
+1 MISC.
+1 STUFF
+SUBTOTAL
+TAX
+TOTAL
+CASH
+CHANGE
+NO REFUNDS
+NO EXCHANGES
+NO RETURNS
+
+03:22 PM
+618
+
+$0.49
+$7.99
+$8.48
+$0.22
+$10.00
+$0.78
+```
+
+### Successful Response (mistral_ocr_to_pdf.py)
 
 ```
 ============================================================
-STEP 1: Extracting text and images with OCR (IMAGE)
+STEP 1: Extracting text and images with Mistral OCR (IMAGE)
 ============================================================
 📸 Encoding image: resources/receipt.jpeg
 ✅ File encoded (141940 characters)
-🚀 Sending to OCR model: mistral-ocr-2505
+🚀 Sending to Mistral OCR model: mistral-ocr-2505
 ✅ Extracted 164 characters of text
 ✅ Found 0 embedded images
 
@@ -166,17 +207,27 @@ SUMMARY
 If you see errors, check:
 
 - The OCR model is enabled/configured in LiteLLM
-- LiteLLM version is v1.79.3 or later (OCR endpoint support)
+- LiteLLM version is v1.79.3 or later (OCR endpoint support for Mistral)
 - Your API key is valid
 - The image/PDF file exists and is readable
 
 ## Response Format
 
-Most OCR models return text in **Markdown format** with:
+### Mistral OCR (`/v1/ocr` endpoint)
 
-- Headers preserved (`# Title`, `## Heading`)
-- Tables properly formatted
-- Image placeholders with IDs
-- Page-by-page extraction for multi-page documents
+Returns structured response with:
 
-The scripts try multiple field names (`markdown`, `text`, `content`) to support different OCR providers.
+- `pages` array with `markdown` text per page
+- `images` array with embedded images (when `--include-images` flag is used)
+- `dimensions` with page size info
+- `usage_info` with processing stats
+
+### DeepSeek OCR (`/v1/chat/completions` endpoint)
+
+Returns standard chat completion response with extracted text in `choices[0].message.content`.
+
+**Known Issues with Vertex AI hosted DeepSeek-OCR:**
+
+- Grounding prompts work for PDFs but cause issues with standalone images
+- Some pages (especially blank or low-contrast pages) may return repeated `0.0.0.0...` patterns
+- Use Mistral OCR for more reliable results with complex documents

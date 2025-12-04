@@ -12,6 +12,3 @@ load_dotenv()
 # API Configuration
 API_KEY = os.getenv("API_KEY")
 BASE_URL = os.getenv("BASE_URL")
-
-OCR_MODEL = "mistral-ocr-2505"
-
